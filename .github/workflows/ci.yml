@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+# A new push to a PR supersedes the previous run; runs on main always finish.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  # "test" is a required status check on main. Renaming it means updating
+  # branch protection too.
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # Until `go mod init` lands there is nothing to build; the job still passes
+      # so the required check doesn't block docs-only PRs.
+      - name: Check for go.mod
+        id: mod
+        run: |
+          if [ -f go.mod ]; then echo "present=true" >> "$GITHUB_OUTPUT"
+          else echo "No go.mod yet, skipping Go checks"; fi
+      - uses: actions/setup-go@v7
+        if: steps.mod.outputs.present == 'true'
+        with:
+          go-version-file: go.mod
+      - name: gofmt
+        if: steps.mod.outputs.present == 'true'
+        run: test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
+      - run: go vet ./...
+        if: steps.mod.outputs.present == 'true'
+      - run: go test -race ./...
+        if: steps.mod.outputs.present == 'true'

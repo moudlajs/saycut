@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Go od nuly: saycut</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#EDF2F4; --surface:#FFFFFF; --ink:#13202B; --muted:#51616E; --line:#CCD8DE;
+  --go:#007D9C; --go-soft:#D6EEF4; --amber:#9A5B00; --amber-bg:#FFF1D9;
+  --ok:#1F8A5B; --ok-bg:#DDF3E8; --bad:#B8362A; --bad-bg:#FBE3E0;
+  --code-bg:#13202B; --code-ink:#DDE8EE;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0D1820; --surface:#132430; --ink:#E2ECF1; --muted:#93A6B2; --line:#25394A;
+    --go:#3CC8E8; --go-soft:#123645; --amber:#F2B25C; --amber-bg:#35270F;
+    --ok:#5BD39A; --ok-bg:#12342A; --bad:#F08A7E; --bad-bg:#3A1C19;
+    --code-bg:#08121A; --code-ink:#DDE8EE;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0D1820; --surface:#132430; --ink:#E2ECF1; --muted:#93A6B2; --line:#25394A;
+  --go:#3CC8E8; --go-soft:#123645; --amber:#F2B25C; --amber-bg:#35270F;
+  --ok:#5BD39A; --ok-bg:#12342A; --bad:#F08A7E; --bad-bg:#3A1C19;
+  --code-bg:#08121A; --code-ink:#DDE8EE;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:calc(env(safe-area-inset-top,0px) + 72px);scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important;animation:none!important}}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Bricolage Grotesque",system-ui,-apple-system,"Segoe UI",sans-serif;font-size:17.5px;line-height:1.6;-webkit-font-smoothing:antialiased}
+code,pre,kbd{font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+a{color:var(--go)}
+:focus-visible{outline:3px solid var(--go);outline-offset:2px;border-radius:4px}
+
+/* nav */
+nav.chips{position:sticky;top:env(safe-area-inset-top,0px);z-index:10;background:var(--bg);border-bottom:1px solid var(--line)}
+.chips-inner{display:flex;gap:6px;overflow-x:auto;padding:10px 16px;max-width:900px;margin:0 auto;scrollbar-width:none}
+.chips-inner::-webkit-scrollbar{display:none}
+.chip{flex:none;display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink);text-decoration:none;font-size:14px;white-space:nowrap}
+.chip b{font-weight:800;color:var(--go)}
+.chip.done{background:var(--ok-bg);border-color:var(--ok)}
+.chip.done b::after{content:" ✓";color:var(--ok)}
+.progress{max-width:900px;margin:0 auto;padding:0 16px 8px;font-size:13px;color:var(--muted);display:flex;align-items:center;gap:10px}
+.bar{flex:1;height:4px;background:var(--line);border-radius:4px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--go);transition:width .4s}
+
+main{max-width:760px;margin:0 auto;padding:0 20px 80px}
+
+/* hero */
+header.hero{max-width:900px;margin:0 auto;padding:48px 20px 24px}
+.hero h1{font-size:clamp(44px,11vw,96px);line-height:.92;font-weight:800;letter-spacing:-.035em;margin:0 0 18px}
+.hero h1 span{display:block;color:var(--go)}
+.hero p.lede{font-size:20px;max-width:34em;margin:0 0 28px;color:var(--muted)}
+
+/* pipeline sim */
+.sim{background:var(--code-bg);color:var(--code-ink);border-radius:18px;padding:18px}
+.sim label{font-size:13px;color:#8FA4B2;display:block;margin-bottom:6px}
+.sim-row{display:flex;gap:8px;flex-wrap:wrap}
+.sim input{flex:1;min-width:200px;font:inherit;font-size:16px;padding:10px 12px;border-radius:10px;border:1px solid #2B4153;background:#0B1822;color:#fff}
+.btn{font:inherit;font-weight:600;font-size:15px;padding:10px 16px;border-radius:10px;border:0;background:var(--go);color:#fff;cursor:pointer}
+.sim .btn{background:#00ADD8;color:#06222C}
+.btn:disabled{opacity:.5;cursor:default}
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
+.steps{display:flex;align-items:center;gap:4px;margin:18px 0 12px;overflow-x:auto}
+.step{flex:none;font-family:"JetBrains Mono",monospace;font-size:13px;padding:8px 10px;border-radius:8px;border:1px solid #2B4153;color:#8FA4B2;transition:all .25s}
+.step.active{border-color:#00ADD8;color:#fff;background:#0F3444}
+.step.fail{border-color:#F08A7E;color:#fff;background:#3A1C19}
+.step.done{border-color:#5BD39A;color:#5BD39A}
+.arrow{color:#3B5366;flex:none}
+.log{font-family:"JetBrains Mono",monospace;font-size:13px;line-height:1.7;min-height:7.2em;white-space:pre-wrap;color:#B8CAD4}
+.log .e{color:#F08A7E}.log .o{color:#5BD39A}
+
+/* chapters */
+section.ch{padding-top:56px}
+.ch-head{display:flex;gap:16px;align-items:baseline;margin-bottom:6px}
+.ch-num{font-size:64px;font-weight:800;line-height:1;color:var(--go);letter-spacing:-.04em;min-width:1.1em}
+.ch h2{font-size:clamp(26px,5vw,36px);line-height:1.1;margin:0;letter-spacing:-.02em}
+.ch h3{font-size:20px;margin:32px 0 8px}
+.ch p{margin:0 0 14px}
+.ch ul{padding-left:1.2em;margin:0 0 14px}
+.ch li{margin-bottom:6px}
+p code,li code,td code,.note code{font-size:.86em;background:var(--go-soft);padding:1px 5px;border-radius:5px}
+pre{background:var(--code-bg);color:var(--code-ink);border-radius:14px;padding:16px 18px;overflow-x:auto;font-size:13.5px;line-height:1.65;margin:0 0 16px}
+pre .k{color:#7FD3EA}pre .s{color:#F2C57C}pre .c{color:#7C909E;font-style:italic}pre .t{color:#B9A3F0}pre .n{color:#F29B8A}
+.file{font-family:"JetBrains Mono",monospace;font-size:13px;color:var(--muted);margin:22px 0 6px}
+.note{border-left:4px solid var(--amber);background:var(--amber-bg);padding:12px 16px;border-radius:0 12px 12px 0;margin:0 0 16px;font-size:16px}
+.note strong{color:var(--amber)}
+.why{border-left:4px solid var(--go);background:var(--go-soft);padding:12px 16px;border-radius:0 12px 12px 0;margin:0 0 16px;font-size:16px}
+.table-wrap{overflow-x:auto;margin:0 0 16px}
+table{border-collapse:collapse;width:100%;font-size:15.5px}
+td,th{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-weight:600;color:var(--muted);font-size:14px}
+.done-btn{margin-top:18px}
+.done-btn[aria-pressed="true"]{background:var(--ok);color:#fff}
+
+/* decoder */
+.dec-grid{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.dec-grid button{font-family:"JetBrains Mono",monospace;font-size:15px;padding:8px 12px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.dec-grid button[aria-pressed="true"]{background:var(--go);border-color:var(--go);color:#fff}
+.dec-panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:16px}
+.dec-panel h4{margin:0 0 6px;font-size:18px}
+.dec-panel pre{margin:10px 0 0}
+
+/* quiz */
+.quiz{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin:20px 0}
+.quiz .q{font-weight:600;margin-bottom:10px}
+.quiz .opts{display:grid;gap:8px}
+.quiz button{font:inherit;font-size:15.5px;text-align:left;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer}
+.quiz button code{background:none;padding:0}
+.quiz button.right{border-color:var(--ok);background:var(--ok-bg)}
+.quiz button.wrong{border-color:var(--bad);background:var(--bad-bg)}
+.quiz .exp{margin-top:10px;font-size:15.5px;color:var(--muted);display:none}
+.quiz.answered .exp{display:block}
+
+/* pointer playground */
+.ptr{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin:16px 0}
+.boxes{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center;margin:8px 0 14px}
+.box{border:2px solid var(--line);border-radius:12px;padding:10px 12px;font-family:"JetBrains Mono",monospace;font-size:14px;min-height:78px;transition:border-color .25s,background .25s}
+.box small{display:block;font-family:"Bricolage Grotesque",sans-serif;color:var(--muted);font-size:13px;margin-bottom:4px}
+.box.hot{border-color:var(--go);background:var(--go-soft)}
+.link{font-size:22px;color:var(--line);transition:color .25s}
+.link.on{color:var(--go)}
+.ptr-btns{display:flex;flex-wrap:wrap;gap:8px}
+.ptr-btns .btn{font-family:"JetBrains Mono",monospace;font-size:13.5px}
+.ptr-msg{margin-top:12px;font-size:15.5px;color:var(--muted);min-height:1.6em}
+
+footer{max-width:760px;margin:0 auto;padding:0 20px 40px;color:var(--muted);font-size:14px}
+</style>
+</head>
+<body>
+
+<nav class="chips" aria-label="Kapitoly">
+  <div class="chips-inner" id="chips"></div>
+  <div class="progress"><span id="progText">0 z 11 hotových</span><div class="bar"><i id="progBar"></i></div></div>
+</nav>
+
+<header class="hero">
+  <h1>Go od nuly <span>saycut</span></h1>
+  <p class="lede">Napíšeš vetu, dostaneš podpísaný Apple Shortcut. Postavíš to sám a po ceste pochopíš, prečo Go vyzerá presne tak, ako vyzerá.</p>
+  <div class="sim" aria-label="Simulácia pipeline">
+    <label for="simInput">Toto na konci bude robiť tvoj program:</label>
+    <div class="sim-row">
+      <input id="simInput" value="Keď prídem domov, pošli mi stav kamier">
+      <button class="btn" id="simRun">Spustiť pipeline</button>
+    </div>
+    <div class="steps" id="simSteps">
+      <span class="step" data-s="prompt">prompt</span><span class="arrow">›</span>
+      <span class="step" data-s="claude">Claude</span><span class="arrow">›</span>
+      <span class="step" data-s="cherri">cherri</span><span class="arrow">›</span>
+      <span class="step" data-s="sign">sign</span><span class="arrow">›</span>
+      <span class="step" data-s="file">.shortcut</span>
+    </div>
+    <div class="log" id="simLog" aria-live="polite">Ťukni na tlačidlo. Všimni si, čo sa stane, keď kompilácia zlyhá.</div>
+  </div>
+</header>
+
+<main>
+
+<!-- 0 -->
+<section class="ch" id="ch0" data-ch="0">
+  <div class="ch-head"><span class="ch-num">0</span><h2>Čo staviame</h2></div>
+  <p>MVP má 6 Go súborov, zhruba 300 riadkov a <strong>nula externých závislostí</strong>. Všetko robí štandardná knižnica Go. Všetky súbory sú v jednom balíku <code>package main</code>, takže ich Go vidí ako jeden program. Na balíky to rozdelíš až neskôr, keď ti bude main tesný.</p>
+<pre><code>saycut/
+├── go.mod              meno modulu + verzia Go
+├── main.go             vstup: argumenty → pipeline → výsledok
+├── config.go           env premenné + validácia
+├── llm.go              HTTP volanie Claude API
+├── cherri.go           spustí kompilátor cherri
+├── sign.go             spustí shortcuts sign
+├── pipeline.go         retry slučka, lepidlo všetkého
+├── pipeline_test.go    prvý test
+├── prompts/system.md   ako má Claude písať Cherri
+├── examples/hello.cherri  ručne overený príklad
+└── Makefile</code></pre>
+  <p>Štart projektu:</p>
+<pre><code>mkdir saycut &amp;&amp; cd saycut
+go mod init github.com/moudlajs/saycut
+go run .          # spustí balík v aktuálnom priečinku</code></pre>
+  <div class="note"><strong>Najprv fáza 0.</strong> Ručne skompiluj a podpíš <code>hello.cherri</code> a over si presné flagy <code>cherri</code> a <code>shortcuts sign</code>. Kód nižšie predpokladá, že cherri vyrobí <code>meno.shortcut</code> vedľa zdrojáku. Ak to robí inak alebo podpisuje sám, upravíš jeden riadok.</div>
+  <button class="btn ghost done-btn" data-done="0" aria-pressed="false">Označiť ako prečítané</button>
+</section>
+
+<!-- 1 -->
+<section class="ch" id="ch1" data-ch="1">
+  <div class="ch-head"><span class="ch-num">1</span><h2>Prečo Go vyzerá divne</h2></div>
+  <p>Tvoj pocit „C krížené s niečím“ je presný. Go navrhli v Google ľudia, ktorí robili Unix a C (Ken Thompson, Rob Pike). Z C prevzali zložené zátvorky a pointery a zvyšok vedome zjednodušili:</p>
+  <ul>
+    <li><strong>Typ je za menom</strong>: <code>name string</code> namiesto <code>string name</code>. Čítaš to zľava doprava: „name je string“. Pri zložitých typoch ako <code>func(int) []string</code> to zostane čitateľné.</li>
+    <li><strong>Žiadne bodkočiarky.</strong> Dopĺňa ich kompilátor, preto <code>{</code> musí byť na rovnakom riadku ako <code>if</code> alebo <code>func</code>.</li>
+    <li><strong>Jedna slučka</strong>: <code>for</code>. Žiadne <code>while</code> ani <code>do</code>.</li>
+    <li><strong>Žiadne triedy, dedičnosť ani výnimky.</strong> Nie je to chýbajúca vec, je to zámer. Menej mágie znamená, že všetko vidíš priamo v kóde.</li>
+    <li><strong>Formátovanie rieši <code>gofmt</code></strong>, takže o medzerách sa nediskutuje.</li>
+  </ul>
+  <h3>Dekodér divných znakov</h3>
+  <p>Ťukni na symbol. Tento zoznam pokrýva skoro všetko, čo ťa v Go zarazí.</p>
+  <div class="dec-grid" id="decGrid"></div>
+  <div class="dec-panel" id="decPanel" aria-live="polite"></div>
+  <button class="btn ghost done-btn" data-done="1" aria-pressed="false">Označiť ako prečítané</button>
+</section>
+
+<!-- 2 -->
+<section class="ch" id="ch2" data-ch="2">
+  <div class="ch-head"><span class="ch-num">2</span><h2>Premenné a typy</h2></div>
+<pre><code class="go">var retries int              // zero value: 0
+var name string              // zero value: ""
+model := "claude-sonnet-5"   // typ string si Go odvodí
+
+files := []string{"main.go", "llm.go"}   // slice = dynamický zoznam
+files = append(files, "sign.go")         // append vracia NOVÝ slice
+
+env := map[string]string{"SAYCUT_MODEL": "claude-sonnet-5"}
+m, ok := env["SAYCUT_MODEL"]              // ok == false, ak kľúč chýba</code></pre>
+  <div class="why"><strong>Zero values.</strong> V Go neexistuje „undefined“. Každá premenná má od začiatku rozumnú hodnotu: <code>0</code>, <code>""</code>, <code>false</code> alebo <code>nil</code> pri pointeroch, mapách a slicoch. Vďaka tomu nemusíš inicializovať všetko ručne.</div>
+  <p>Typy sú statické a Go nič nekonvertuje potichu. Z env premennej dostaneš vždy <code>string</code> a na číslo ju prevedieš explicitne cez <code>strconv.Atoi</code>, ktorý ti môže vrátiť chybu. Toto je pre Go typické: čo môže zlyhať, vidíš priamo v podpise funkcie.</p>
+  <p>Funkcie môžu vracať <strong>viac hodnôt</strong>. Na tom stojí celé spracovanie chýb:</p>
+<pre><code class="go">n, err := strconv.Atoi("3")    // n == 3, err == nil
+n, err = strconv.Atoi("tri")   // n == 0, err != nil</code></pre>
+  <div class="quiz" data-q="zero"></div>
+  <button class="btn ghost done-btn" data-done="2" aria-pressed="false">Označiť ako prečítané</button>
+</section>
+
+<!-- 3 -->
+<section class="ch" id="ch3" data-ch="3">
+  <div class="ch-head"><span class="ch-num">3</span><h2>Structy namiesto tried</h2></div>
+  <p><strong>Struct</strong> je len vrecko s pomenovanými poľami. Nemá konštruktor, dedičnosť ani <code>this</code>. Správanie mu pridáš cez metódy a „konštruktor“ je obyčajná funkcia, ktorá sa podľa konvencie volá <code>NewX</code> alebo <code>LoadX</code>.</p>
+  <p class="file">config.go</p>
+<pre><code class="go">package main
+
+import (
+	"errors"
+	"fmt"
+	"os"
+	"strconv"
+)
+
+type Config struct {
+	APIKey     string
+	Model      string
+	MaxRetries int
+	OutDir     string
+}
+
+func LoadConfig() (Config, error) {
+	cfg := Config{
+		APIKey:     os.Getenv("ANTHROPIC_API_KEY"),
+		Model:      os.Getenv("SAYCUT_MODEL"),
+		MaxRetries: 3,
+		OutDir:     "dist",
+	}
+	if cfg.APIKey == "" {
+		return Config{}, errors.New("ANTHROPIC_API_KEY is not set")
+	}
+	if cfg.Model == "" {
+		return Config{}, errors.New("SAYCUT_MODEL is not set")
+	}
+	if v := os.Getenv("SAYCUT_MAX_RETRIES"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil {
+			return Config{}, fmt.Errorf("SAYCUT_MAX_RETRIES must be a number: %w", err)
+		}
+		cfg.MaxRetries = n
+	}
+	return cfg, nil
+}</code></pre>
+  <ul>
+    <li><strong>Veľké písmeno znamená verejné.</strong> <code>Config</code> a <code>APIKey</code> vidí aj iný balík, <code>apiKey</code> nie. Namiesto <code>public</code> a <code>private</code> Go rozhoduje podľa veľkosti prvého písmena.</li>
+    <li><code>Config{APIKey: ...}</code> je struct literál. Polia, ktoré nevyplníš, dostanú zero value.</li>
+    <li><code>if v := ...; v != ""</code> je if s krátkou inicializáciou. Premenná <code>v</code> existuje len vnútri toho ifu.</li>
+    <li>Pri chybe vraciame <code>Config{}</code>, teda prázdny struct, a chybu. Volajúci sa pozrie najprv na chybu.</li>
+  </ul>
+  <p>Metódu pridáš cez <strong>receiver</strong>, teda parameter pred menom funkcie:</p>
+<pre><code class="go">func (c Config) Summary() string {
+	return fmt.Sprintf("%s, %d pokusy", c.Model, c.MaxRetries)
+}
+// použitie: cfg.Summary()</code></pre>
+  <div class="quiz" data-q="export"></div>
+  <button class="btn ghost done-btn" data-done="3" aria-pressed="false">Označiť ako prečítané</button>
+</section>
+
+<!-- 4 -->
+<section class="ch" id="ch4" data-ch="4">
+  <div class="ch-head"><span class="ch-num">4</span><h2>Pointery: &amp; a *</h2></div>
+  <p>Keď v Go odovzdáš hodnotu funkcii, funkcia dostane <strong>kópiu</strong>, podobne ako fotokópiu papiera. Pointer je naopak <strong>link na Google Doc</strong>: kto ho má, upravuje originál.</p>
+  <ul>
+    <li><code>&amp;cfg</code> znamená „daj mi link na cfg“, teda jeho adresu.</li>
+    <li><code>*Config</code> v type znamená „link na Config“.</li>
+    <li><code>*p</code> vo výraze znamená „otvor link“, teda hodnotu na adrese. Pri poliach structu to Go robí za teba, preto píšeš <code>p.Model</code>, nie <code>(*p).Model</code>.</li>
+  </ul>
+<pre><code class="go">func setModel(c Config)   { c.Model = "haiku" }  // zmení kópiu
+func setModelP(c *Config) { c.Model = "haiku" }  // zmení originál
+
+cfg := Config{Model: "sonnet"}
+setModel(cfg)     // cfg.Model je stále "sonnet"
+setModelP(&amp;cfg)   // cfg.Model je teraz "haiku"</code></pre>
+  <div class="ptr">
+    <div class="boxes">
+      <div class="box" id="boxOrig"><small>cfg (originál)</small>Model: <span id="origVal">"sonnet"</span></div>
+      <span class="link" id="ptrLink" aria-hidden="true">⟵</span>
+      <div class="box" id="boxFn"><small>c vo funkcii</small><span id="fnVal">(funkcia nebeží)</span></div>
+    </div>
+    <div class="ptr-btns">
+      <button class="btn" id="ptrVal">setModel(cfg)</button>
+      <button class="btn" id="ptrPtr">setModelP(&amp;cfg)</button>
+      <button class="btn ghost" id="ptrReset">Reset</button>
+    </div>
+    <div class="ptr-msg" id="ptrMsg" aria-live="polite"></div>
+  </div>
+  <p><strong>Kedy použiť pointer:</strong> keď chceš meniť originál, keď je struct veľký, alebo keď ide o niečo zdieľané ako HTTP klient. Pre tvoje typy so stavom (<code>*LLM</code>, <code>*Pipeline</code>) používaj pointer receiver. Malé hodnotové veci ako <code>Config</code> pokojne kopíruj.</p>
+  <div class="quiz" data-q="ptr"></div>
+  <button class="btn ghost done-btn" data-done="4" aria-pressed="false">Označiť ako prečítané</button>
+</section>
+
+<!-- 5 -->
+<section class="ch" id="ch5" data-ch="5">
+  <div class="ch-head"><span class="ch-num">5</span><h2>Chyby bez výnimiek</h2></div>
+  <p>Go nemá <code>try/catch</code>. Chyba je obyčajná hodnota typu <code>error</code>, ktorú funkcia vráti ako poslednú. Uvidíš tento vzor stokrát:</p>
+<pre><code class="go">out, err := doSomething()
+if err != nil {
+	return fmt.Errorf("do something: %w", err)
+}</code></pre>
+  <p>Každá vrstva pridá kontext a pošle chybu vyššie. <code>%w</code> („wrap“) pôvodnú chybu zabalí, nezahodí ju. Na konci dostaneš celý príbeh:</p>
+<pre><code>gave up after 3 attempts: cherri failed: exit status 1
+line 4: unknown action "sendNotifcation"</code></pre>
+  <div class="why">Na prvý pohľad to vyzerá ako veľa opakovania. Výhoda je, že každé miesto, kde môže program zlyhať, vidíš priamo v kóde, bez neviditeľných skokov. Pre explicitný štýl, aký máš rád pri IaC, je to v podstate ideálne.</div>
+  <p><code>errors.Is(err, os.ErrNotExist)</code> vie nájsť konkrétnu chybu aj v zabalenom reťazci. <code>panic</code> existuje, ale len pre situácie, keď je program úplne rozbitý. Bežné chyby ním nerieš.</p>
+  <div class="quiz" data-q="wrap"></div>
+  <button class="btn ghost done-btn" data-done="5" aria-pressed="false">Označiť ako prečítané</button>
+</section>
+
+<!-- 6 -->
+<section class="ch" id="ch6" data-ch="6">
+  <div class="ch-head"><span class="ch-num">6</span><h2>Hovoríme s Claude</h2></div>
+  <p>Nepotrebuješ SDK. Stačí HTTP POST s JSON telom a na tom si precvičíš structy, tagy aj pointery naraz.</p>
+  <p class="file">llm.go</p>
+<pre><code class="go">package main
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"time"
+)
+
+type Message struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
+
+type apiRequest struct {
+	Model     string    `json:"model"`
+	MaxTokens int       `json:"max_tokens"`
+	System    string    `json:"system"`
+	Messages  []Message `json:"messages"`
+}
+
+type apiResponse struct {
+	Content []struct {
+		Type string `json:"type"`
+		Text string `json:"text"`
+	} `json:"content"`
+}
+
+type LLM struct {
+	apiKey string
+	model  string
+	client *http.Client
+}
+
+func NewLLM(cfg Config) *LLM {
+	return &amp;LLM{
+		apiKey: cfg.APIKey,
+		model:  cfg.Model,
+		client: &amp;http.Client{Timeout: 90 * time.Second},
+	}
+}
+
+func (l *LLM) Ask(ctx context.Context, system string, msgs []Message) (string, error) {
+	body, err := json.Marshal(apiRequest{
+		Model: l.model, MaxTokens: 4096, System: system, Messages: msgs,
+	})
+	if err != nil {
+		return "", fmt.Errorf("encode request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
+		"https://api.anthropic.com/v1/messages", bytes.NewReader(body))
+	if err != nil {
+		return "", fmt.Errorf("build request: %w", err)
+	}
+	req.Header.Set("x-api-key", l.apiKey)
+	req.Header.Set("anthropic-version", "2023-06-01")
+	req.Header.Set("content-type", "application/json")
+
+	resp, err := l.client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("call API: %w", err)
+	}
+	defer resp.Body.Close()
+
+	raw, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("read response: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("API returned %d: %s", resp.StatusCode, raw)
+	}
+
+	var out apiResponse
+	if err := json.Unmarshal(raw, &amp;out); err != nil {
+		return "", fmt.Errorf("decode response: %w", err)
+	}
+	for _, c := range out.Content {
+		if c.Type == "text" {
+			return c.Text, nil
+		}
+	}
+	return "", errors.New("API response has no text")
+}</code></pre>
+  <ul>
+    <li><strong><code>`json:"max_tokens"`</code> je struct tag.</strong> Hovorí balíku <code>encoding/json</code>, ako sa pole volá v JSON. V Go je to <code>MaxTokens</code>, v API <code>max_tokens</code>.</li>
+    <li><code>apiRequest</code> má malé písmeno, lebo mimo balíka ho nikto nepotrebuje. Polia má ale veľké, lebo <code>json</code> je iný balík a malé polia by nevidel.</li>
+    <li><code>Content []struct{...}</code> je <strong>anonymný struct</strong>: tvar dát, ktorý potrebuješ len na jednom mieste a nemusíš ho pomenovať.</li>
+    <li><code>json.Unmarshal(raw, &amp;out)</code> dostane pointer, pretože má <em>zapisovať do tvojej premennej</em>. S kópiou by zapisoval do vzduchu. Tu vidíš zmysel kapitoly 4 v praxi.</li>
+    <li><code>defer resp.Body.Close()</code> sa spustí pri odchode z funkcie, nech odíde ktorýmkoľvek <code>return</code>. Upratovanie tak máš napísané hneď vedľa otvorenia.</li>
+    <li><code>ctx</code> (context) nesie timeout a zrušenie. Keď vyprší, request sa preruší. V Go ho podľa konvencie posielaš ako prvý parameter.</li>
+    <li><code>for _, c := range</code> prechádza slice. <code>_</code> zahadzuje index, ktorý nepotrebuješ.</li>
+  </ul>
+  <button class="btn ghost done-btn" data-done="6" aria-pressed="false">Označiť ako prečítané</button>
+</section>
+
+<!-- 7 -->
+<section class="ch" id="ch7" data-ch="7">
+  <div class="ch-head"><span class="ch-num">7</span><h2>Spúšťanie iných programov</h2></div>
+  <p>Cherri aj <code>shortcuts</code> sú CLI nástroje. Go ich spustí cez <code>os/exec</code>, podobne ako keby si ich spustil v termináli.</p>
+  <p class="file">cherri.go</p>
+<pre><code class="go">package main
+
+import (
+	"context"
+	"fmt"
+	"os/exec"
+	"strings"
+)
+
+// Compile returns the path of the compiled .shortcut.
+// On failure the error contains cherri's output, so the LLM can fix its code.
+func Compile(ctx context.Context, srcPath string) (string, error) {
+	out, err := exec.CommandContext(ctx, "cherri", srcPath).CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("cherri failed: %w\n%s", err, out)
+	}
+	// ASSUMPTION: foo.cherri -&gt; foo.shortcut. Verify in phase 0.
+	return strings.TrimSuffix(srcPath, ".cherri") + ".shortcut", nil
+}</code></pre>
+  <p class="file">sign.go</p>
+<pre><code class="go">package main
+
+import (
+	"context"
+	"fmt"
+	"os/exec"
+)
+
+func Sign(ctx context.Context, in, out string) error {
+	cmd := exec.CommandContext(ctx, "shortcuts", "sign",
+		"--mode", "anyone", "--input", in, "--output", out)
+	if b, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("shortcuts sign failed: %w\n%s", err, b)
+	}
+	return nil
+}</code></pre>
+  <ul>
+    <li><code>CombinedOutput()</code> vráti stdout a stderr spolu ako <code>[]byte</code>, teda surové bajty. <code>%s</code> ich vypíše ako text.</li>
+    <li>Výstup kompilátora vkladáme do chyby zámerne. Presne tento text pôjde späť do Claude ako „oprav toto“.</li>
+    <li>Argumenty sa odovzdávajú ako samostatné stringy, nie ako jeden príkaz pre shell, takže tu nehrozí shell injection.</li>
+  </ul>
+  <div class="note"><strong>Pozor:</strong> ak fáza 0 ukáže, že cherri na macOS podpisuje sám, <code>sign.go</code> zmažeš a pipeline je o krok kratšia.</div>
+  <button class="btn ghost done-btn" data-done="7" aria-pressed="false">Označiť ako prečítané</button>
+</section>
+
+<!-- 8 -->
+<section class="ch" id="ch8" data-ch="8">
+  <div class="ch-head"><span class="ch-num">8</span><h2>Pipeline a retry slučka</h2></div>
+  <p>Tu je jadro celej appky, presne to, čo si videl v simulácii hore. Keď kompilácia zlyhá, pridáme do konverzácie chybu a skúsime znova.</p>
+  <p class="file">pipeline.go</p>
+<pre><code class="go">package main
+
+import (
+	"context"
+	"fmt"
+	"log/slog"
+	"os"
+	"path/filepath"
+	"strings"
+)
+
+type Pipeline struct {
+	cfg    Config
+	llm    *LLM
+	system string
+}
+
+func (p *Pipeline) Run(ctx context.Context, name, prompt string) (string, error) {
+	msgs := []Message{{Role: "user", Content: prompt}}
+	var lastErr error
+
+	for attempt := 1; attempt &lt;= p.cfg.MaxRetries; attempt++ {
+		slog.Info("generating", "name", name, "attempt", attempt)
+
+		src, err := p.llm.Ask(ctx, p.system, msgs)
+		if err != nil {
+			return "", err // API is down: retrying compile won't help
+		}
+		src = stripFences(src)
+
+		srcPath := filepath.Join(p.cfg.OutDir, name+".cherri")
+		if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
+			return "", fmt.Errorf("write source: %w", err)
+		}
+
+		unsigned, err := Compile(ctx, srcPath)
+		if err != nil {
+			lastErr = err
+			slog.Warn("compile failed", "attempt", attempt, "err", err)
+			msgs = append(msgs,
+				Message{Role: "assistant", Content: src},
+				Message{Role: "user", Content: "Compilation failed:\n" + err.Error() +
+					"\nFix it. Reply with Cherri code only."},
+			)
+			continue
+		}
+
+		signed := filepath.Join(p.cfg.OutDir, name+".signed.shortcut")
+		if err := Sign(ctx, unsigned, signed); err != nil {
+			return "", err
+		}
+		slog.Info("done", "file", signed, "attempts", attempt)
+		return signed, nil
+	}
+	return "", fmt.Errorf("gave up after %d attempts: %w", p.cfg.MaxRetries, lastErr)
+}
+
+// stripFences removes ```cherri ... ``` if the model wraps its answer.
+func stripFences(s string) string {
+	s = strings.TrimSpace(s)
+	s = strings.TrimPrefix(s, "```cherri")
+	s = strings.TrimPrefix(s, "```")
+	s = strings.TrimSuffix(s, "```")
+	return strings.TrimSpace(s)
+}</code></pre>
+  <ul>
+    <li><code>for attempt := 1; attempt &lt;= N; attempt++</code> je klasická trojdielna slučka, rovnaká ako v C.</li>
+    <li><code>[]Message{{Role: ...}}</code> je slice s jedným structom. Vnútorné <code>{}</code> sú struct a vonkajšie slice. Typ vo vnútri Go domyslí.</li>
+    <li>Konverzácia rastie cez <code>append</code>: Claude uvidí svoj pôvodný kód aj chybu, a preto ho vie cielene opraviť.</li>
+    <li><code>continue</code> skočí na ďalší pokus. <code>lastErr</code> si pamätá poslednú chybu pre finálnu správu.</li>
+    <li><code>0o644</code> je oktálové číslo, rovnaké práva ako pri <code>chmod 644</code>.</li>
+    <li><code>slog</code> loguje štruktúrovane ako páry kľúč–hodnota. Neskôr ho prepneš na JSON výstup jedným riadkom.</li>
+  </ul>
+  <button class="btn ghost done-btn" data-done="8" aria-pressed="false">Označiť ako prečítané</button>
+</section>
+
+<!-- 9 -->
+<section class="ch" id="ch9" data-ch="9">
+  <div class="ch-head"><span class="ch-num">9</span><h2>main.go a prvé spustenie</h2></div>
+  <p class="file">main.go</p>
+<pre><code class="go">package main
+
+import (
+	"context"
+	"fmt"
+	"log/slog"
+	"os"
+	"time"
+)
+
+func main() {
+	if err := run(); err != nil {
+		slog.Error("saycut failed", "err", err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
+	if len(os.Args) &lt; 3 {
+		return fmt.Errorf(`usage: saycut &lt;name&gt; "&lt;what the shortcut should do&gt;"`)
+	}
+	name, prompt := os.Args[1], os.Args[2]
+
+	cfg, err := LoadConfig()
+	if err != nil {
+		return err
+	}
+	system, err := os.ReadFile("prompts/system.md")
+	if err != nil {
+		return fmt.Errorf("read system prompt: %w", err)
+	}
+	if err := os.MkdirAll(cfg.OutDir, 0o755); err != nil {
+		return fmt.Errorf("create out dir: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
+
+	p := &amp;Pipeline{cfg: cfg, llm: NewLLM(cfg), system: string(system)}
+	path, err := p.Run(ctx, name, prompt)
+	if err != nil {
+		return err
+	}
+	fmt.Println(path)
+	return nil
+}</code></pre>
+  <div class="why"><strong>Prečo <code>main</code> + <code>run</code>?</strong> <code>os.Exit</code> ukončí program okamžite a <code>defer</code> sa už nespustí. Preto celá logika beží v <code>run()</code>, ktorá vracia chybu, a <code>main</code> len rozhodne o exit kóde. Máš tak jedno miesto na exit a všetky defery prebehnú.</div>
+  <p>Spustenie:</p>
+<pre><code>export ANTHROPIC_API_KEY=sk-ant-...
+export SAYCUT_MODEL=claude-sonnet-5
+go run . domov "Keď prídem domov, pošli mi notifikáciu Vitaj doma"
+# dist/domov.signed.shortcut
+open dist/domov.signed.shortcut      # import dialóg</code></pre>
+  <p class="file">Makefile</p>
+<pre><code>build:
+	go build -o bin/saycut .
+test:
+	go test ./...
+lint:
+	go vet ./...</code></pre>
+  <button class="btn ghost done-btn" data-done="9" aria-pressed="false">Označiť ako prečítané</button>
+</section>
+
+<!-- 10 -->
+<section class="ch" id="ch10" data-ch="10">
+  <div class="ch-head"><span class="ch-num">10</span><h2>Interface a prvý test</h2></div>
+  <p>Interface v Go je <strong>zoznam metód</strong>. Každý typ, ktorý tie metódy má, ho splňa <em>automaticky</em>, bez <code>implements</code>. Je to duck typing, ktorý overuje kompilátor.</p>
+<pre><code class="go">type Generator interface {
+	Ask(ctx context.Context, system string, msgs []Message) (string, error)
+}
+
+type Pipeline struct {
+	cfg    Config
+	llm    Generator   // namiesto *LLM
+	system string
+}</code></pre>
+  <p><code>*LLM</code> už metódu <code>Ask</code> má, takže nič iné meniť nemusíš. V testoch mu podstrčíš falošný generátor, ktorý nevolá API ani neminie žiadne tokeny. Rovnako neskôr spravíš <code>Compiler</code> interface a otestuješ celú retry logiku bez cherri.</p>
+  <p>Prvý test, v Go štýle „table-driven“:</p>
+  <p class="file">pipeline_test.go</p>
+<pre><code class="go">package main
+
+import "testing"
+
+func TestStripFences(t *testing.T) {
+	tests := []struct {
+		name, in, want string
+	}{
+		{"plain", "a", "a"},
+		{"fenced", "```cherri\na\n```", "a"},
+		{"spaces", "  a  ", "a"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := stripFences(tt.in); got != tt.want {
+				t.Errorf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}</code></pre>
+  <p>Súbor končiaci na <code>_test.go</code> sa kompiluje len pre <code>go test</code>. Tabuľka prípadov je slice anonymných structov: nový prípad pridáš jedným riadkom.</p>
+  <div class="quiz" data-q="iface"></div>
+  <button class="btn ghost done-btn" data-done="10" aria-pressed="false">Označiť ako prečítané</button>
+</section>
+
+<!-- 11 -->
+<section class="ch" id="ch11" data-ch="11">
+  <div class="ch-head"><span class="ch-num">11</span><h2>Čo ďalej: Telegram bot</h2></div>
+  <p>Keď CLI funguje end-to-end, bot je len ďalší vstup do tej istej pipeline. Pribudne ti prvá externá závislosť (Telegram knižnica cez <code>go get</code>) a nový koncept, na ktorý je Go najviac známe:</p>
+<pre><code class="go">for update := range updates {   // updates je channel
+	go handle(update)          // každá správa vo vlastnej goroutine
+}</code></pre>
+  <ul>
+    <li><strong>Goroutine</strong> (<code>go f()</code>) je veľmi lacné paralelné vlákno. Kým jedna správa čaká 20 sekúnd na Claude, bot odpovedá ďalším.</li>
+    <li><strong>Channel</strong> (<code>chan</code>, <code>&lt;-</code>) je rúra, cez ktorú si goroutiny posielajú dáta. Knižnica ti cez ňu podáva nové správy.</li>
+    <li>Pred botom nezabudni na whitelist chat ID a sanitizáciu <code>name</code>, lebo z neho robíš cestu k súboru.</li>
+    <li>Keď ti <code>package main</code> prerastie, rozdeľ ho do <code>internal/llm</code>, <code>internal/pipeline</code> atď. a pridaj <code>cmd/saycut</code> a <code>cmd/bot</code>. Tam sa naučíš balíky a importy.</li>
+  </ul>
+  <p>Postup: najprv to napíš sám podľa tohto návodu a Claude Code použi až ako reviewera. Opačné poradie by ťa Go nenaučilo.</p>
+  <button class="btn ghost done-btn" data-done="11" aria-pressed="false">Označiť ako prečítané</button>
+</section>
+
+</main>
+
+<footer>Postup sa ukladá len v tomto prehliadači.</footer>
+
+<script>
+(function(){
+  /* ---------- syntax highlight ---------- */
+  var KW='package|import|func|return|if|else|for|range|var|const|type|struct|interface|defer|go|chan|select|case|switch|continue|break|nil|true|false|map';
+  var TY='string|int|bool|error|byte|any';
+  var re=new RegExp('(\\/\\/[^\\n]*)|("(?:\\\\.|[^"\\\\\\n])*"|`[^`]*`)|\\b('+KW+')\\b|\\b('+TY+')\\b|\\b(0o\\d+|\\d+)\\b','g');
+  function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+  function hl(src){
+    var out='',last=0,m;re.lastIndex=0;
+    while((m=re.exec(src))){
+      out+=esc(src.slice(last,m.index));
+      var c=m[1]?'c':m[2]?'s':m[3]?'k':m[4]?'t':'n';
+      out+='<span class="'+c+'">'+esc(m[0])+'</span>';
+      last=re.lastIndex;
+    }
+    return out+esc(src.slice(last));
+  }
+  function highlightAll(root){(root||document).querySelectorAll('code.go').forEach(function(el){el.innerHTML=hl(el.textContent);});}
+  highlightAll();
+
+  /* ---------- progress ---------- */
+  var TITLES=['Plán','Syntax','Typy','Structy','Pointery','Chyby','Claude API','exec','Pipeline','main','Interface','Bot'];
+  var KEY='goguide-done';
+  var done={};
+  try{done=JSON.parse(localStorage.getItem(KEY)||'{}')||{};}catch(e){done={};}
+  function save(){try{localStorage.setItem(KEY,JSON.stringify(done));}catch(e){}}
+  var chips=document.getElementById('chips');
+  TITLES.forEach(function(t,i){
+    var a=document.createElement('a');a.className='chip';a.href='#ch'+i;a.dataset.i=i;
+    a.innerHTML='<b>'+i+'</b>'+t;chips.appendChild(a);
+  });
+  function render(){
+    var n=0;
+    TITLES.forEach(function(_,i){
+      var on=!!done[i]; if(on)n++;
+      chips.querySelector('[data-i="'+i+'"]').classList.toggle('done',on);
+      var b=document.querySelector('[data-done="'+i+'"]');
+      if(b){b.setAttribute('aria-pressed',on);b.textContent=on?'Hotovo ✓':'Označiť ako prečítané';}
+    });
+    document.getElementById('progText').textContent=n+' z '+TITLES.length+' hotových';
+    document.getElementById('progBar').style.width=(n/TITLES.length*100)+'%';
+  }
+  document.querySelectorAll('[data-done]').forEach(function(b){
+    b.addEventListener('click',function(){var i=b.dataset.done;done[i]=!done[i];save();render();});
+  });
+  render();
+
+  /* ---------- pipeline sim ---------- */
+  var runBtn=document.getElementById('simRun'),log=document.getElementById('simLog');
+  var slow=!window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function step(s,state){
+    document.querySelectorAll('#simSteps .step').forEach(function(el){
+      if(el.dataset.s===s){el.className='step '+state;}
+      else if(el.classList.contains('active')){el.className='step done';}
+    });
+  }
+  function line(t,cls){var d=document.createElement('div');if(cls)d.className=cls;d.textContent=t;log.appendChild(d);}
+  runBtn.addEventListener('click',function(){
+    var p=document.getElementById('simInput').value.trim()||'Vitaj doma';
+    runBtn.disabled=true;log.textContent='';
+    document.querySelectorAll('#simSteps .step').forEach(function(el){el.className='step';});
+    var seq=[
+      ['prompt','active','prompt: "'+p+'"'],
+      ['claude','active','Claude píše Cherri (pokus 1/3)'],
+      ['cherri','fail','cherri: line 4: unknown action "sendNotifcation"','e'],
+      ['claude','active','chyba ide späť do konverzácie (pokus 2/3)'],
+      ['cherri','active','cherri: kompilácia OK'],
+      ['sign','active','shortcuts sign --mode anyone: OK'],
+      ['file','done','dist/domov.signed.shortcut, ťukni a importuj','o']
+    ];
+    var i=0;
+    (function next(){
+      if(i>=seq.length){runBtn.disabled=false;return;}
+      var s=seq[i++];step(s[0],s[1]);line(s[2],s[3]);
+      setTimeout(next,slow?850:150);
+    })();
+  });
+
+  /* ---------- decoder ---------- */
+  var SYM=[
+    [':=','Vytvor premennú a odvoď typ','Skratka za var x T = hodnota. Funguje len vnútri funkcií. Na úrovni balíka musíš písať var.','name := "saycut"\n// to isté ako:\nvar name string = "saycut"'],
+    ['&x','Adresa premennej','„Daj mi link na x.“ Výsledok má typ *T. Používaš, keď má funkcia meniť originál.','setModelP(&cfg)\njson.Unmarshal(raw, &out)'],
+    ['*T','Pointer na T (v type)','V deklarácii typu znamená „link na T“. Vo výraze *p znamená „hodnota, na ktorú p ukazuje“.','func NewLLM(cfg Config) *LLM\nvar p *Config = &cfg'],
+    ['[]T','Slice, dynamický zoznam','Rastie cez append. Pozor: append vracia nový slice, vždy ho priraď späť.','files := []string{"a.go"}\nfiles = append(files, "b.go")'],
+    ['map[K]V','Slovník','Kľúč → hodnota. Čítanie chýbajúceho kľúča vráti zero value. Či kľúč existuje, zistíš cez „comma ok“.','env := map[string]string{}\nv, ok := env["X"]  // ok == false'],
+    ['func (p *T)','Receiver, metóda typu','Namiesto triedy s metódami pripojíš funkciu k typu. p je v podstate „this“, len explicitne pomenované.','func (p *Pipeline) Run(...) error {\n\t// p.cfg, p.llm ...\n}'],
+    ['_','Zahoď hodnotu','Go nedovolí nepoužitú premennú, takže to, čo nepotrebuješ, pošleš do _.','for _, c := range out.Content { ... }'],
+    ['...','Variadic / rozbalenie','V parametri: funkcia berie ľubovoľný počet hodnôt. Pri volaní: rozbaľ slice na jednotlivé prvky.','func log(args ...any)\nall = append(all, more...)'],
+    ['`json:"x"`','Struct tag','Metadáta pre iný balík. Tu hovoria JSON enkodéru, ako sa pole volá v JSON.','MaxTokens int `json:"max_tokens"`'],
+    ['err != nil','Nastala chyba?','nil = „nič“. Ak je chyba nil, všetko prebehlo OK. Tento riadok napíšeš tisíckrát.','if err != nil {\n\treturn fmt.Errorf("x: %w", err)\n}'],
+    ['%w','Zabaľ chybu','V fmt.Errorf zachová pôvodnú chybu vo vnútri novej. %v by z nej spravil len text.','fmt.Errorf("compile: %w", err)'],
+    ['defer','Spusti pri odchode','Naplánuje volanie na koniec funkcie, nech odchádza akokoľvek. Ideálne na Close() a cancel().','resp, err := client.Do(req)\n// ...\ndefer resp.Body.Close()'],
+    ['<-','Channel: pošli alebo prijmi','Šípka ukazuje smer dát. ch <- x pošle, x := <-ch prijme. Stretneš ho pri Telegram bote.','ch := make(chan string)\ngo func() { ch <- "hi" }()\nmsg := <-ch'],
+    ['any','Hocijaký typ','Alias pre interface{}, teda prázdny interface, ktorý splňa každý typ. Používaj ho striedmo.','func Print(v any)']
+  ];
+  var grid=document.getElementById('decGrid'),panel=document.getElementById('decPanel');
+  function show(i){
+    var s=SYM[i];
+    grid.querySelectorAll('button').forEach(function(b,j){b.setAttribute('aria-pressed',j===i);});
+    panel.innerHTML='';
+    var h=document.createElement('h4');h.textContent=s[0]+'  '+s[1];
+    var p=document.createElement('p');p.style.margin='0';p.textContent=s[2];
+    var pre=document.createElement('pre'),c=document.createElement('code');c.className='go';c.textContent=s[3];pre.appendChild(c);
+    panel.appendChild(h);panel.appendChild(p);panel.appendChild(pre);
+    highlightAll(panel);
+  }
+  SYM.forEach(function(s,i){var b=document.createElement('button');b.textContent=s[0];b.addEventListener('click',function(){show(i);});grid.appendChild(b);});
+  show(0);
+
+  /* ---------- quizzes ---------- */
+  var Q={
+    zero:{q:'Aká je hodnota premennej po var count int?',o:['undefined','nil','0','kompilátor hlási chybu'],a:2,e:'Zero value pre int je 0. V Go nič nie je „undefined“.'},
+    export:{q:'Struct má pole apiKey. Vidí ho iný balík?',o:['Áno','Nie, malé písmeno znamená neexportované','Len cez pointer'],a:1,e:'Viditeľnosť určuje prvé písmeno. apiKey je súkromné pre balík, APIKey by bolo verejné.'},
+    ptr:{q:'Prečo json.Unmarshal(raw, &out) potrebuje &?',o:['Je to rýchlejšie','Unmarshal musí zapísať do tvojej premennej, nie do kópie','Lebo out je string'],a:1,e:'Bez & by funkcia dostala kópiu a naplnila by ju. Tvoja premenná by ostala prázdna.'},
+    wrap:{q:'Čo je rozdiel medzi %w a %v vo fmt.Errorf?',o:['Žiadny','%w zachová pôvodnú chybu vnútri, takže funguje errors.Is','%w je len pre warningy'],a:1,e:'%v zmení chybu na text. %w ju zabalí, takže reťazec vieš neskôr prehľadávať.'},
+    iface:{q:'Ako povieš, že *LLM implementuje Generator?',o:['implements Generator','Nijako, stačí, že má metódu Ask so správnym podpisom','Cez struct tag'],a:1,e:'Interfaces v Go sa splňajú implicitne. Kompilátor si to overí sám, keď *LLM priradíš do poľa typu Generator.'}
+  };
+  document.querySelectorAll('.quiz').forEach(function(box){
+    var d=Q[box.dataset.q];if(!d)return;
+    var q=document.createElement('div');q.className='q';q.textContent=d.q;box.appendChild(q);
+    var opts=document.createElement('div');opts.className='opts';box.appendChild(opts);
+    var exp=document.createElement('div');exp.className='exp';exp.textContent=d.e;
+    d.o.forEach(function(t,i){
+      var b=document.createElement('button');b.textContent=t;
+      b.addEventListener('click',function(){
+        if(box.classList.contains('answered'))return;
+        box.classList.add('answered');
+        b.classList.add(i===d.a?'right':'wrong');
+        opts.children[d.a].classList.add('right');
+      });
+      opts.appendChild(b);
+    });
+    box.appendChild(exp);
+  });
+
+  /* ---------- pointer playground ---------- */
+  var origVal=document.getElementById('origVal'),fnVal=document.getElementById('fnVal'),
+      boxO=document.getElementById('boxOrig'),boxF=document.getElementById('boxFn'),
+      link=document.getElementById('ptrLink'),msg=document.getElementById('ptrMsg');
+  var orig='sonnet',busy=false;
+  function reset(){orig='sonnet';origVal.textContent='"sonnet"';fnVal.textContent='(funkcia nebeží)';boxO.classList.remove('hot');boxF.classList.remove('hot');link.classList.remove('on');msg.textContent='';}
+  var d1=slow?600:50;
+  document.getElementById('ptrVal').addEventListener('click',function(){
+    if(busy)return;busy=true;link.classList.remove('on');boxO.classList.remove('hot');
+    boxF.classList.add('hot');fnVal.textContent='kópia: Model "'+orig+'"';
+    msg.textContent='Funkcia dostala fotokópiu cfg…';
+    setTimeout(function(){fnVal.textContent='kópia: Model "haiku"';msg.textContent='Kópia sa zmenila, originál má stále "'+orig+'". Po skončení funkcie kópia zmizne.';busy=false;},d1);
+  });
+  document.getElementById('ptrPtr').addEventListener('click',function(){
+    if(busy)return;busy=true;boxF.classList.add('hot');link.classList.add('on');
+    fnVal.textContent='c = 0xc000010030 (adresa cfg)';msg.textContent='Funkcia dostala link na originál…';
+    setTimeout(function(){boxO.classList.add('hot');orig='haiku';origVal.textContent='"haiku"';msg.textContent='Zmena cez link = zmena originálu. cfg.Model je teraz "haiku".';busy=false;},d1);
+  });
+  document.getElementById('ptrReset').addEventListener('click',function(){if(!busy)reset();});
+})();
+</script>
+</body>
+</html>
